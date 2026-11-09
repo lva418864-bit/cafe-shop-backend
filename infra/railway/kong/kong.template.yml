@@ -1,3 +1,4 @@
+
 # =============================================================================
 # RAILWAY KONG TEMPLATE (DB-less). Rendered at container start by entrypoint.sh
 # into /tmp/kong.yml. Placeholders:
@@ -10,6 +11,7 @@
 # (the local config). Only upstream hosts, the CORS origin and the Railway-only
 # "gateway-health" route differ. Check drift with scripts/check-kong-routes.ps1.
 # =============================================================================
+
 _format_version: "3.0"
 _transform: true
 
@@ -37,7 +39,7 @@ services:
   # 1. USER & AUTHENTICATION SERVICE (Upstream: user-service:8001/user)
   # ---------------------------------------------------------------------------
   - name: user-service
-    url: ${USER_SERVICE_URL}/user
+    url: "${USER_SERVICE_URL}/user"
     connect_timeout: 5000
     read_timeout: 15000
     write_timeout: 15000
@@ -56,7 +58,7 @@ services:
 
   # Dedicated rate-limited route for login attempts (10/min brute-force defense)
   - name: user-login-service
-    url: ${USER_SERVICE_URL}/user/login
+    url: "${USER_SERVICE_URL}/user/login"
     connect_timeout: 5000
     read_timeout: 10000
     write_timeout: 10000
@@ -80,7 +82,7 @@ services:
   # ---------------------------------------------------------------------------
   # Orders (/api/orders -> /order)
   - name: operation-service-orders
-    url: ${OPERATION_SERVICE_URL}/order
+    url: "${OPERATION_SERVICE_URL}/order"
     connect_timeout: 5000
     read_timeout: 15000
     write_timeout: 15000
@@ -99,7 +101,7 @@ services:
 
   # Products (/api/products -> /product)
   - name: operation-service-products
-    url: ${OPERATION_SERVICE_URL}/product
+    url: "${OPERATION_SERVICE_URL}/product"
     connect_timeout: 5000
     read_timeout: 15000
     write_timeout: 15000
@@ -138,7 +140,7 @@ services:
 
   # Product Images Upload & Management (~/api/products/<id>/images -> /api/products/<id>/images)
   - name: operation-service-product-images
-    url: ${OPERATION_SERVICE_URL}
+    url: "${OPERATION_SERVICE_URL}"
     connect_timeout: 5000
     read_timeout: 30000
     write_timeout: 30000
@@ -190,7 +192,7 @@ services:
 
   # Public Media Files (/api/media/<key> or /media/<key> -> /media/<key>)
   - name: operation-service-media
-    url: ${OPERATION_SERVICE_URL}/media
+    url: "${OPERATION_SERVICE_URL}/media"
     connect_timeout: 5000
     read_timeout: 15000
     write_timeout: 15000
@@ -219,7 +221,7 @@ services:
 
   # Categories (/api/categories -> /category)
   - name: operation-service-categories
-    url: ${OPERATION_SERVICE_URL}/category
+    url: "${OPERATION_SERVICE_URL}/category"
     connect_timeout: 5000
     read_timeout: 15000
     write_timeout: 15000
@@ -259,7 +261,7 @@ services:
   # 3. REPORT SERVICE (Upstream: report-service:8003/report)
   # ---------------------------------------------------------------------------
   - name: report-service
-    url: ${REPORT_SERVICE_URL}/report
+    url: "${REPORT_SERVICE_URL}/report"
     connect_timeout: 5000
     read_timeout: 30000
     write_timeout: 30000
@@ -278,7 +280,7 @@ services:
   # ---------------------------------------------------------------------------
   # Aggregated primary health route (proxies to operation-service health)
   - name: main-health-service
-    url: ${OPERATION_SERVICE_URL}/health
+    url: "${OPERATION_SERVICE_URL}/health"
     connect_timeout: 3000
     read_timeout: 5000
     write_timeout: 5000
@@ -291,7 +293,7 @@ services:
           - GET
 
   - name: user-health-service
-    url: ${USER_SERVICE_URL}/health
+    url: "${USER_SERVICE_URL}/health"
     connect_timeout: 3000
     read_timeout: 5000
     write_timeout: 5000
@@ -304,7 +306,7 @@ services:
           - GET
 
   - name: operation-health-service
-    url: ${OPERATION_SERVICE_URL}/health
+    url: "${OPERATION_SERVICE_URL}/health"
     connect_timeout: 3000
     read_timeout: 5000
     write_timeout: 5000
@@ -317,7 +319,7 @@ services:
           - GET
 
   - name: report-health-service
-    url: ${REPORT_SERVICE_URL}/health
+    url: "${REPORT_SERVICE_URL}/health"
     connect_timeout: 3000
     read_timeout: 5000
     write_timeout: 5000
