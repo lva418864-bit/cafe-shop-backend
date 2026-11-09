@@ -192,8 +192,19 @@ with respx.mock(assert_all_called=False) as rmock:
     sys.path = [str(root / 'operation_service')] + [p for p in sys.path if not any(p.endswith(x) for x in ['user_service', 'operation_service', 'report_service'])]
     os.environ['DATABASE_URL'] = r'{o_db_url}'
     from app.core.database import SessionLocal as OSessionDel
-    from app.models.payment import Payment as OpPaymentDel
-    from app.models.order import Order as OpOrderDel
+    from app.models.category import Category  # noqa: F401
+    from app.models.customization import CustomizationGroup, CustomizationOption  # noqa: F401
+    from app.models.product import Product, ProductImage  # noqa: F401
+    from app.models.order import Order as OpOrderDel, OrderItem  # noqa: F401
+    from app.models.payment import (  # noqa: F401
+        IdempotencyRecord,
+        Payment,
+        PaymentAttempt,
+        PaymentEvent,
+        Refund,
+        VerificationJob,
+    )
+    from app.models.stock_movement import StockMovement  # noqa: F401
     o_del_db = OSessionDel()
     o_del_db.query(OpOrderDel).filter(OpOrderDel.id == order_id).delete()
     o_del_db.commit()
