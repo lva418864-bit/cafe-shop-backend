@@ -1,0 +1,233 @@
+name: coffee-railway-sim
+
+# =============================================================================
+# LOCAL RAILWAY ARCHITECTURE SIMULATION (TEST ONLY - NO CLOUD CALLS)
+# =============================================================================
+# Verifies that:
+#   1. Every backend service builds strictly from its isolated root directory.
+#   2. Kong runs in DB-less mode using the Railway Dockerfile & entrypoint.
+#   3. Kong Admin API is disabled (port closed).
+#   4. Postgres, backends, and Kong are internal-only (no published host ports).
+#   5. The browser communicates ONLY with the frontend (port 3000), which
+#      forwards API and media calls to Kong over the private network.
+#   6. Migrations run idempotently on startup.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. DATABASE: PostgreSQL 16 (Private internal network only; no host ports)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: coffee_sim_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_sim_test_password}
+      POSTGRES_DB: postgres
+    volumes:
+      - railway_sim_postgres_data:/var/lib/postgresql/data
+      - ../../postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - railway_sim_network
+    expose:
+      - "5432"
+
+  # ---------------------------------------------------------------------------
+  # 2. USER SERVICE (Isolated root directory build; private internal network)
+  # ---------------------------------------------------------------------------
+  user-service:
+    build:
+      context: ../../user_service
+      dockerfile: Dockerfile
+    container_name: coffee_sim_user_service
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: local
+      PORT: 8001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: user_service_db
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres_sim_test_password}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-sim_throwaway_jwt_secret_key_32_chars_min!!}
+      JWT_ALGORITHM: HS256
+      CORS_ORIGINS: ${PUBLIC_BASE_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - railway_sim_network
+    expose:
+      - "8001"
+
+  # ---------------------------------------------------------------------------
+  # 3. OPERATION SERVICE (Isolated root directory build; uploads volume)
+  # ---------------------------------------------------------------------------
+  operation-service:
+    build:
+      context: ../../operation_service
+      dockerfile: Dockerfile
+    container_name: coffee_sim_operation_service
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: local
+      PORT: 8002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: operation_service_db
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres_sim_test_password}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-sim_throwaway_jwt_secret_key_32_chars_min!!}
+      JWT_ALGORITHM: HS256
+      CORS_ORIGINS: ${PUBLIC_BASE_URL:-http://localhost:3000}
+      BAKONG_ACCOUNT_ID: ${BAKONG_ACCOUNT_ID:-merchant_sim@bank}
+      BAKONG_TOKEN: ${BAKONG_TOKEN:-sim_dev_token_for_railway_check}
+      BAKONG_MERCHANT_NAME: Coffee Shop
+      BAKONG_MERCHANT_CITY: Phnom Penh
+      BAKONG_MAX_AMOUNT_USD: ${BAKONG_MAX_AMOUNT_USD:-1.00}
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - railway_sim_uploads_data:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - railway_sim_network
+    expose:
+      - "8002"
+
+  # ---------------------------------------------------------------------------
+  # 4. REPORT SERVICE (Isolated root directory build; private internal network)
+  # ---------------------------------------------------------------------------
+  report-service:
+    build:
+      context: ../../report_service
+      dockerfile: Dockerfile
+    container_name: coffee_sim_report_service
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: local
+      PORT: 8003
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: report_service_db
+      DB_USER: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres_sim_test_password}
+      USER_SERVICE_BASE_URL: http://user-service:8001
+      OPERATION_SERVICE_BASE_URL: http://operation-service:8002
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-sim_throwaway_jwt_secret_key_32_chars_min!!}
+      JWT_ALGORITHM: HS256
+      CORS_ORIGINS: ${PUBLIC_BASE_URL:-http://localhost:3000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - railway_sim_network
+    expose:
+      - "8003"
+
+  # ---------------------------------------------------------------------------
+  # 5. KONG GATEWAY (Railway DB-less image; Admin API off; internal only)
+  # ---------------------------------------------------------------------------
+  kong:
+    build:
+      context: ./kong
+      dockerfile: Dockerfile
+    container_name: coffee_sim_kong
+    restart: unless-stopped
+    environment:
+      PORT: 8000
+      USER_SERVICE_URL: http://user-service:8001
+      OPERATION_SERVICE_URL: http://operation-service:8002
+      REPORT_SERVICE_URL: http://report-service:8003
+      CORS_ORIGIN: ${PUBLIC_BASE_URL:-http://localhost:3000}
+    depends_on:
+      user-service:
+        condition: service_healthy
+      operation-service:
+        condition: service_healthy
+      report-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - railway_sim_network
+    expose:
+      - "8000"
+
+  # ---------------------------------------------------------------------------
+  # 6. FRONTEND (Standalone build; same-origin proxy to Kong; ONLY public port)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ../../../coffee_shop_frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: "" # Relative paths on same-origin!
+        NEXT_PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+        PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+    container_name: coffee_sim_frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      KONG_INTERNAL_URL: http://kong:8000
+      INTERNAL_API_BASE_URL: http://kong:8000
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:3000}
+    ports:
+      # The ONLY service port exposed to the host
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-3000}:3000"
+    depends_on:
+      kong:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/login || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - railway_sim_network
+
+networks:
+  railway_sim_network:
+    name: coffee_railway_sim_network
+    driver: bridge
+
+volumes:
+  railway_sim_postgres_data:
+    name: coffee_railway_sim_postgres_data
+    driver: local
+  railway_sim_uploads_data:
+    name: coffee_railway_sim_uploads_data
+    driver: local

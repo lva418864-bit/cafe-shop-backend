@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from sqlalchemy.engine import URL
 
 _SERVICE_DIR = Path(__file__).resolve().parent.parent.parent
 Environment = Literal["local", "dev", "staging", "production", "test"]
@@ -104,6 +105,14 @@ class Settings(BaseSettings):
                     "Startup validation failed: BAKONG_ACCOUNT_ID is missing or empty. "
                     "Configure BAKONG_ACCOUNT_ID in .env before starting the service."
                 )
+            if self.BAKONG_MAX_AMOUNT_USD <= 0:
+                raise ValueError("Startup validation failed: BAKONG_MAX_AMOUNT_USD must be greater than 0.")
+            if not self.BAKONG_MERCHANT_NAME.strip() or not self.BAKONG_MERCHANT_CITY.strip():
+                raise ValueError(
+                    "Startup validation failed: BAKONG_MERCHANT_NAME and BAKONG_MERCHANT_CITY must not be empty."
+                )
+        if self.is_production and "*" in self.CORS_ORIGINS:
+            raise ValueError("CORS_ORIGINS must list the frontend origin(s) explicitly (not '*') when ENVIRONMENT=production")
         return self
 
     @property
@@ -114,7 +123,15 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         if self.DATABASE_URL:
             return self.DATABASE_URL
-        return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        # URL.create escapes special characters in the password (e.g. '@', '/', '%').
+        return URL.create(
+            "postgresql+psycopg2",
+            username=self.DB_USER,
+            password=self.DB_PASSWORD,
+            host=self.DB_HOST,
+            port=self.DB_PORT,
+            database=self.DB_NAME,
+        ).render_as_string(hide_password=False)
 
 
 settings = Settings()
