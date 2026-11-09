@@ -1,0 +1,11 @@
+# Auto-detect text files and normalize line endings to LF on commit
+* text=auto
+
+# Ensure shell scripts always retain Unix LF line endings across Windows checkouts
+*.sh text eol=lf
+*.bash text eol=lf
+*.entrypoint text eol=lf
+Dockerfile* text eol=lf
+
+# PowerShell scripts retain CRLF on Windows
+*.ps1 text eol=crlf

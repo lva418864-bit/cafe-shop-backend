@@ -1,0 +1,15 @@
+target-version = "py312"
+line-length = 120
+extend-exclude = [".venv", "**/.venv", "docs"]
+
+[lint]
+# Pyflakes + pycodestyle errors + import sorting basics. Kept conservative so
+# the existing codebase passes without a mass reformat.
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+[lint.per-file-ignores]
+# main.py files import models only for their side effect of registering
+# tables on Base.metadata.
+"*/app/main.py" = ["F401"]
+"*/app/models/*.py" = ["F821"]

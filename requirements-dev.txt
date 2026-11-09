@@ -1,0 +1,6 @@
+-r requirements.txt
+pytest==8.4.2
+ruff==0.14.2
+mypy==1.18.2
+respx==0.22.0
+polyfactory==2.22.3

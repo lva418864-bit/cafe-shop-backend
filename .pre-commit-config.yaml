@@ -1,0 +1,18 @@
+repos:
+  - repo: local
+    hooks:
+      - id: no-mock-data-outside-tests
+        name: No mock/test data outside tests/
+        entry: python scripts/check_mock_patterns.py
+        language: system
+        pass_filenames: true
+      - id: no-env-files
+        name: Do not commit .env files
+        entry: .env files must not be committed (use .env.example)
+        language: fail
+        files: (^|/)\.env$
+      - id: ruff
+        name: ruff
+        entry: python -m ruff check
+        language: system
+        types: [python]

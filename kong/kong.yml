@@ -1,0 +1,360 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. USER & AUTHENTICATION SERVICE (Upstream: user-service:8001/user)
+  # ---------------------------------------------------------------------------
+  - name: user-service
+    url: http://user-service:8001/user
+    connect_timeout: 5000
+    read_timeout: 15000
+    write_timeout: 15000
+    routes:
+      - name: user-auth-route
+        paths:
+          - /api/auth
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+
+  # Dedicated rate-limited route for login attempts (10/min brute-force defense)
+  - name: user-login-service
+    url: http://user-service:8001/user/login
+    connect_timeout: 5000
+    read_timeout: 10000
+    write_timeout: 10000
+    routes:
+      - name: user-login-route
+        paths:
+          - /api/auth/login
+        strip_path: true
+        methods:
+          - POST
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 10
+              policy: local
+              fault_tolerant: true
+              hide_client_headers: false
+
+  # ---------------------------------------------------------------------------
+  # 2. OPERATION SERVICE (Upstream: operation-service:8002)
+  # ---------------------------------------------------------------------------
+  # Orders (/api/orders -> /order)
+  - name: operation-service-orders
+    url: http://operation-service:8002/order
+    connect_timeout: 5000
+    read_timeout: 15000
+    write_timeout: 15000
+    routes:
+      - name: operation-orders-route
+        paths:
+          - /api/orders
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+          - OPTIONS
+
+  # Products (/api/products -> /product)
+  - name: operation-service-products
+    url: http://operation-service:8002/product
+    connect_timeout: 5000
+    read_timeout: 15000
+    write_timeout: 15000
+    routes:
+      # Public read-only catalog & product detail route (no JWT required, GET-only)
+      - name: operation-products-public-route
+        paths:
+          - /api/products
+        strip_path: true
+        methods:
+          - GET
+          - HEAD
+          - OPTIONS
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 120
+              policy: local
+              fault_tolerant: true
+              hide_client_headers: false
+          - name: request-size-limiting
+            config:
+              allowed_payload_size: 1
+              size_unit: kilobytes
+              require_content_length: false
+      # Protected staff/admin product mutations (JWT required in backend)
+      - name: operation-products-write-route
+        paths:
+          - /api/products
+        strip_path: true
+        methods:
+          - POST
+          - PUT
+          - PATCH
+          - DELETE
+
+  # Product Images Upload & Management (~/api/products/<id>/images -> /api/products/<id>/images)
+  - name: operation-service-product-images
+    url: http://operation-service:8002
+    connect_timeout: 5000
+    read_timeout: 30000
+    write_timeout: 30000
+    routes:
+      # Public read-only product image metadata route (GET-only)
+      - name: operation-product-images-public-route
+        paths:
+          - ~/api/products/[0-9]+/images
+        strip_path: false
+        regex_priority: 200
+        methods:
+          - GET
+          - HEAD
+          - OPTIONS
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 120
+              policy: local
+              fault_tolerant: true
+              hide_client_headers: false
+          - name: request-size-limiting
+            config:
+              allowed_payload_size: 1
+              size_unit: kilobytes
+              require_content_length: false
+      # Protected staff/admin product image upload/update/delete route
+      - name: operation-product-images-route
+        paths:
+          - ~/api/products/[0-9]+/images
+        strip_path: false
+        regex_priority: 200
+        methods:
+          - POST
+          - PATCH
+          - DELETE
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 20
+              policy: local
+              fault_tolerant: true
+              hide_client_headers: false
+          - name: request-size-limiting
+            config:
+              allowed_payload_size: 6
+              size_unit: megabytes
+              require_content_length: false
+
+  # Public Media Files (/api/media/<key> or /media/<key> -> /media/<key>)
+  - name: operation-service-media
+    url: http://operation-service:8002/media
+    connect_timeout: 5000
+    read_timeout: 15000
+    write_timeout: 15000
+    routes:
+      - name: operation-media-route
+        paths:
+          - /api/media
+          - /media
+        strip_path: true
+        methods:
+          - GET
+          - HEAD
+          - OPTIONS
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 300
+              policy: local
+              fault_tolerant: true
+              hide_client_headers: false
+          - name: request-size-limiting
+            config:
+              allowed_payload_size: 1
+              size_unit: kilobytes
+              require_content_length: false
+
+  # Categories (/api/categories -> /category)
+  - name: operation-service-categories
+    url: http://operation-service:8002/category
+    connect_timeout: 5000
+    read_timeout: 15000
+    write_timeout: 15000
+    routes:
+      # Public read-only categories route (no JWT required, GET-only)
+      - name: operation-categories-public-route
+        paths:
+          - /api/categories
+        strip_path: true
+        methods:
+          - GET
+          - HEAD
+          - OPTIONS
+        plugins:
+          - name: rate-limiting
+            config:
+              minute: 120
+              policy: local
+              fault_tolerant: true
+              hide_client_headers: false
+          - name: request-size-limiting
+            config:
+              allowed_payload_size: 1
+              size_unit: kilobytes
+              require_content_length: false
+      # Protected staff/admin category mutations (JWT required in backend)
+      - name: operation-categories-write-route
+        paths:
+          - /api/categories
+        strip_path: true
+        methods:
+          - POST
+          - PUT
+          - DELETE
+
+  # ---------------------------------------------------------------------------
+  # 3. REPORT SERVICE (Upstream: report-service:8003/report)
+  # ---------------------------------------------------------------------------
+  - name: report-service
+    url: http://report-service:8003/report
+    connect_timeout: 5000
+    read_timeout: 30000
+    write_timeout: 30000
+    routes:
+      - name: report-routes
+        paths:
+          - /api/reports
+        strip_path: true
+        methods:
+          - GET
+          - POST
+          - OPTIONS
+
+  # ---------------------------------------------------------------------------
+  # 4. HEALTH CHECK ROUTES
+  # ---------------------------------------------------------------------------
+  # Aggregated primary health route (proxies to operation-service health)
+  - name: main-health-service
+    url: http://operation-service:8002/health
+    connect_timeout: 3000
+    read_timeout: 5000
+    write_timeout: 5000
+    routes:
+      - name: main-health-route
+        paths:
+          - /health
+        strip_path: true
+        methods:
+          - GET
+
+  - name: user-health-service
+    url: http://user-service:8001/health
+    connect_timeout: 3000
+    read_timeout: 5000
+    write_timeout: 5000
+    routes:
+      - name: user-health-route
+        paths:
+          - /health/user
+        strip_path: true
+        methods:
+          - GET
+
+  - name: operation-health-service
+    url: http://operation-service:8002/health
+    connect_timeout: 3000
+    read_timeout: 5000
+    write_timeout: 5000
+    routes:
+      - name: operation-health-route
+        paths:
+          - /health/operation
+        strip_path: true
+        methods:
+          - GET
+
+  - name: report-health-service
+    url: http://report-service:8003/health
+    connect_timeout: 3000
+    read_timeout: 5000
+    write_timeout: 5000
+    routes:
+      - name: report-health-route
+        paths:
+          - /health/report
+        strip_path: true
+        methods:
+          - GET
+
+# =============================================================================
+# GLOBAL PLUGINS (Applied across all routes)
+# =============================================================================
+plugins:
+  # 1. CORS Plugin
+  - name: cors
+    config:
+      origins:
+        - "http://localhost:3000"
+        - "http://127.0.0.1:3000"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+        - HEAD
+      headers:
+        - Accept
+        - Accept-Version
+        - Content-Length
+        - Content-MD5
+        - Content-Type
+        - Date
+        - Authorization
+        - X-Request-ID
+      exposed_headers:
+        - X-Request-ID
+        - Content-Length
+        - Content-Type
+        - Date
+        - RateLimit-Limit
+        - RateLimit-Remaining
+        - RateLimit-Reset
+        - X-RateLimit-Limit-Minute
+        - X-RateLimit-Remaining-Minute
+      credentials: true
+      max_age: 3600
+
+  # 2. Correlation ID Plugin
+  - name: correlation-id
+    config:
+      header_name: X-Request-ID
+      generator: uuid#counter
+      echo_downstream: true
+
+  # 3. Request Size Limiting Plugin (10MB payload max)
+  - name: request-size-limiting
+    config:
+      allowed_payload_size: 10
+      size_unit: megabytes
+
+  # 4. Global Rate Limiting Plugin (100 req/min per client IP, local memory)
+  - name: rate-limiting
+    config:
+      minute: 100
+      policy: local
+      fault_tolerant: true
+      hide_client_headers: false

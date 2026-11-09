@@ -1,0 +1,40 @@
+# Secrets / local config - copy the matching .env.example instead
+.env
+.env.*
+!.env.example
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Frontend / JS
+node_modules/
+.next/
+
+# Local DB files created by tests / tools
+*.db
+*.sqlite*
+*.sqlite3
+
+# Backups written by cleanup scripts (contain personal data)
+backups/
+**/backups/
+
+# Local uploads and agent scratch notes
+uploads/
+**/uploads/
+.agent-notes.txt
+
+# IDE
+.idea/workspace.xml
+.idea/dataSources/
+.idea/dataSources.local.xml
+.idea/shelf/
+.vscode/
