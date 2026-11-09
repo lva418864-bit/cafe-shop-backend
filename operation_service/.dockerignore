@@ -1,0 +1,39 @@
+# Git and IDE
+.git
+.gitignore
+.gitattributes
+.idea
+.vscode
+
+# Python Virtual Environments and Caches
+.venv
+venv
+__pycache__
+**/__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.ruff_cache
+.mypy_cache
+*.egg-info
+
+# Secrets, Environment Files & Certificates
+.env
+.env.*
+!.env.example
+*.pem
+
+# Local Databases, Backups, and Scratch Notes
+*.db
+*.sqlite*
+*.sqlite3
+backups
+uploads
+.agent-notes.txt
+
+# Tests and Docs (never include in runtime image)
+tests/
+docs/
+*.md
+pytest.ini
+Dockerfile*
