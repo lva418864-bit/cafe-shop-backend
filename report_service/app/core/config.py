@@ -8,6 +8,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
+from sqlalchemy.engine import URL
 
 _SERVICE_DIR = Path(__file__).resolve().parent.parent.parent
 Environment = Literal["local", "dev", "staging", "production", "test"]
@@ -67,6 +68,8 @@ class Settings(BaseSettings):
                 f"JWT_SECRET_KEY is a known placeholder or shorter than {_MIN_PRODUCTION_SECRET_LENGTH} chars; "
                 "refusing to start with ENVIRONMENT=production"
             )
+        if self.is_production and "*" in self.CORS_ORIGINS:
+            raise ValueError("CORS_ORIGINS must list the frontend origin(s) explicitly (not '*') when ENVIRONMENT=production")
         return self
 
     @property
@@ -77,7 +80,15 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         if self.DATABASE_URL:
             return self.DATABASE_URL
-        return f"postgresql+psycopg2://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        # URL.create escapes special characters in the password (e.g. '@', '/', '%').
+        return URL.create(
+            "postgresql+psycopg2",
+            username=self.DB_USER,
+            password=self.DB_PASSWORD,
+            host=self.DB_HOST,
+            port=self.DB_PORT,
+            database=self.DB_NAME,
+        ).render_as_string(hide_password=False)
 
 
 settings = Settings()

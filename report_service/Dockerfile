@@ -1,8 +1,11 @@
+# Build context = this folder (report_service/). Works as a Railway Root Directory
+# and with docker-compose (context: ./report_service).
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH="/app/report_service"
+    PYTHONPATH="/app" \
+    PORT=8003
 
 WORKDIR /app
 
@@ -12,12 +15,11 @@ RUN groupadd --system --gid 1001 appgroup \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY --chown=appuser:appgroup report_service/ /app/report_service/
-
-WORKDIR /app/report_service
+COPY --chown=appuser:appgroup . /app/
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod 0755 /app/entrypoint.sh
 
 USER appuser
 
 EXPOSE 8003
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003"]
+CMD ["sh", "/app/entrypoint.sh"]
