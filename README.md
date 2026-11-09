@@ -109,7 +109,8 @@ All versions below are taken directly from [`requirements.txt`](requirements.txt
 D:\Study\Year-4\Python\
 ├── coffee_shop/                        # Backend & Docker Compose Git repository root
 │   ├── .github/workflows/              # CI pipeline configuration (ci.yml)
-│   ├── docs/                           # Architecture, Docker, Kong APIM, and Bakong KHQR guides
+│   ├── docs/                           # Architecture, Docker, Kong APIM, Bakong KHQR, and Railway deploy guides
+│   ├── infra/railway/                  # Railway deployment templates (Kong template, compose simulation)
 │   ├── kong/                           # Kong Gateway declarative configuration (kong.yml)
 │   ├── libs/testing/coffee_testing/    # Shared test fixtures and JWT/payload helpers
 │   ├── operation_service/              # Catalog, stock, orders, and Bakong KHQR microservice (:8002)
@@ -175,6 +176,11 @@ docker compose exec operation-service alembic upgrade head
 curl.exe -s http://localhost:8000/health
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke.ps1
 ```
+
+### Deploy on Railway
+
+For deploying this platform to Railway cloud hosting using monorepo private networking, PostgreSQL, DB-less Kong Gateway, and Next.js same-origin reverse proxy, refer to the step-by-step guide:
+👉 **[Railway Deploy Guide (`docs/RAILWAY_DEPLOY_GUIDE.md`)](./docs/RAILWAY_DEPLOY_GUIDE.md)**
 
 ---
 
@@ -278,6 +284,7 @@ docker compose up -d --force-recreate operation-service
 
 ## 11. Documentation & Guides
 
+- **[Railway Deploy Guide (`docs/RAILWAY_DEPLOY_GUIDE.md`)](./docs/RAILWAY_DEPLOY_GUIDE.md)** — Production deployment on Railway with monorepo private networking, DB-less Kong Gateway, Next.js 15 standalone same-origin proxy, persistent volume uploads, and Bakong KHQR.
 - **[Docker Start Guide (`docs/DOCKER_START_GUIDE.md`)](./docs/DOCKER_START_GUIDE.md)** — Beginner-friendly step-by-step setup, `.env` configuration, migrations, backup/restore, and **[Troubleshooting Table](./docs/DOCKER_START_GUIDE.md#12-troubleshooting-table)**.
 - **[Kong APIM Guide (`docs/APIM_KONG_GUIDE.md`)](./docs/APIM_KONG_GUIDE.md)** — Gateway request flow, active routes & plugins, DB-less vs Postgres DB entities, runtime management, and Kong troubleshooting.
 - **[Bakong KHQR Guide (`docs/BAKONG_KHQR_GUIDE.md`)](./docs/BAKONG_KHQR_GUIDE.md)** — NBC Bakong vs app responsibilities, PostgreSQL payment schema, state machine, payment verification flow, social share previews, and KHQR troubleshooting.

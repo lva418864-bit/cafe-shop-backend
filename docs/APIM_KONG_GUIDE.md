@@ -207,3 +207,26 @@ docker compose logs -f --tail 50 kong
 | Browser console: `Access to XMLHttpRequest at 'http://localhost:8000/...' from origin 'http://localhost:3000' has been blocked by CORS policy` | **CORS Error** | Frontend accessed via an origin not listed in `kong/kong.yml` `plugins[name=cors].config.origins` (e.g., a LAN IP or custom tunnel domain). | Open the frontend via `http://localhost:3000` (or `http://127.0.0.1:3000`), or add your custom origin to `origins:` in `kong/kong.yml` and run `docker compose up -d --force-recreate kong`. |
 | **Route not found after editing `kong/kong.yml`** | **`404 Not Found`** | Kong was not reloaded after editing `kong/kong.yml`, or Windows NTFS inode replacement prevented the bind mount from updating inside the container. | Run `docker compose exec kong kong config parse /kong/declarative/kong.yml` to check for YAML syntax errors, then run `docker compose up -d --force-recreate kong`. |
 | **Plugin not applied to a route** | N/A | Plugin was indented under `services` instead of top-level `plugins:` (for global) or `routes[].plugins:` (for route-specific) in `kong/kong.yml`. | Verify plugin placement in `kong/kong.yml` and check active plugins via `(Invoke-RestMethod -Uri "http://127.0.0.1:8001/plugins").data`. |
+
+---
+
+## 11. Kong on Railway (DB-less)
+
+When deploying to **Railway**, Kong runs in DB-less mode using dedicated configuration in [`infra/railway/kong/`](../infra/railway/kong/):
+
+### Dynamic Private Upstream Resolution
+- In local Docker, upstreams are static DNS aliases (`http://user-service:8001`, `http://operation-service:8002`, `http://report-service:8003`).
+- On Railway, private service domains can be customized (e.g., `user-service.railway.internal`).
+- To support this dynamically without baking domains into Git, [`infra/railway/kong/kong.template.yml`](../infra/railway/kong/kong.template.yml) uses template placeholders (`${USER_SERVICE_HOST}`, `${USER_SERVICE_PORT}`, etc.).
+- The entrypoint script ([`infra/railway/kong/entrypoint.sh`](../infra/railway/kong/entrypoint.sh)) substitutes these environment variables with `sed`, validates the generated YAML with `kong config parse /tmp/kong.yml`, and exits fast if any variable is missing or invalid.
+
+### Why Admin API Is Disabled on Railway (`KONG_ADMIN_LISTEN=off`)
+- In local development, the Admin API is bound strictly to `127.0.0.1:8001` for debugging.
+- On Railway, Kong runs purely in **DB-less declarative mode** (`KONG_DATABASE=off`), meaning all routing and plugin configuration is fixed at container startup from the template.
+- Exposing the Admin API without authentication inside a private network creates unnecessary attack surface. Therefore, `KONG_ADMIN_LISTEN=off` turns off the Admin API entirely.
+
+### Real Client IP Resolution
+- Since frontend traffic passes through Railway edge routing and the Next.js same-origin reverse proxy, Kong is configured with `KONG_TRUSTED_IPS=0.0.0.0/0,::/0` and `KONG_REAL_IP_HEADER=X-Forwarded-For`.
+- This ensures Kong rate-limiting plugins track actual client IP addresses rather than the internal proxy IP.
+
+For full deployment steps and environment variable listings, see **[Railway Deploy Guide (`docs/RAILWAY_DEPLOY_GUIDE.md`)](./RAILWAY_DEPLOY_GUIDE.md)**.

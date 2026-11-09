@@ -2,7 +2,8 @@
 
 > **Target Environment**: Windows 10 / 11 + PowerShell + Docker Desktop (WSL2 Linux containers).  
 > **Project Scope**: Local study project only (not production).  
-> Every recommendation in this guide is marked **[MUST]**, **[SHOULD]**, or **[NICE-TO-HAVE]**.
+> Every recommendation in this guide is marked **[MUST]**, **[SHOULD]**, or **[NICE-TO-HAVE]**.  
+> For deploying to Railway instead of running locally, see [Railway Deploy Guide](RAILWAY_DEPLOY_GUIDE.md).
 
 ---
 
