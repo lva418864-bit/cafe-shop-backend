@@ -32,8 +32,8 @@ services:
   # ===========================================================================
   user-service:
     build:
-      context: .
-      dockerfile: user_service/Dockerfile
+      context: ./user_service
+      dockerfile: Dockerfile
     container_name: coffee_user_service
     restart: unless-stopped
     env_file:
@@ -65,8 +65,8 @@ services:
 
   operation-service:
     build:
-      context: .
-      dockerfile: operation_service/Dockerfile
+      context: ./operation_service
+      dockerfile: Dockerfile
     container_name: coffee_operation_service
     restart: unless-stopped
     env_file:
@@ -104,8 +104,8 @@ services:
 
   report-service:
     build:
-      context: .
-      dockerfile: report_service/Dockerfile
+      context: ./report_service
+      dockerfile: Dockerfile
     container_name: coffee_report_service
     restart: unless-stopped
     env_file:
