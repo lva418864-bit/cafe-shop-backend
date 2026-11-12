@@ -205,6 +205,7 @@ For deploying this platform to Railway cloud hosting using monorepo private netw
 | `USER_SERVICE_BASE_URL` | Internal URL for `report-service` to pull user snapshots | `http://user-service:8001` | `report-service` | No |
 | `OPERATION_SERVICE_BASE_URL` | Internal URL for `report-service` to pull product/order snapshots | `http://operation-service:8002` | `report-service` | No |
 | `SYNC_PAGE_SIZE` | Page size used by `report-service` snapshot pagination | `100` | `report-service` | No |
+| `SYNC_TIMEOUT_SECONDS` | Outbound HTTP timeout in seconds for report snapshot synchronization | `30.0` | `report-service` | No |
 | `CORS_ORIGINS` | Comma-separated allowed CORS origins | `http://localhost:3000,http://127.0.0.1:3000` | All 3 backend services | No |
 | `BAKONG_ACCOUNT_ID` | Merchant Bakong account ID receiving funds (fail-fast required) | `<your-merchant@bank>` | `operation-service` | **Yes** |
 | `BAKONG_TOKEN` | NBC Bakong Developer API Bearer JWT token (fail-fast required) | `<your-bakong-jwt-token>` | `operation-service` | **Yes** |
@@ -279,6 +280,20 @@ docker compose up -d --force-recreate operation-service
 - **[MUST] Real Money Warning**: `operation-service` uses `RealBakongClient` (`bakong-khqr`) connected to NBC Bakong. Scanning a generated KHQR code with a live Cambodian banking app transfers **real money** to the configured `BAKONG_ACCOUNT_ID`. Keep `BAKONG_MAX_AMOUNT_USD=1.00` (or lower, e.g., `$0.10`) when testing, and always scan from a different personal account than the merchant receiving account.
 - **[MUST] Keep Kong Admin API Private**: Port `8001` (`KONG_ADMIN_LISTEN`) is bound strictly to `127.0.0.1:8001` on the Windows host. Never bind port `8001` to `0.0.0.0` on a public server.
 - **[SHOULD] Identical JWT Secret Across Services**: `user-service` signs JWTs and `operation-service` / `report-service` verify them locally. If `JWT_SECRET_KEY` differs between `.env` files, authenticated calls will fail with `401 Unauthorized`.
+- **[MUST] Report Service Snapshot Synchronization**:
+  - **Purpose**: `report-service` maintains isolated, denormalized snapshot tables (`users_snapshot`, `products_snapshot`, `orders_snapshot`, `order_items_snapshot`) in `report_service_db` to decouple analytical aggregations and dashboard queries from core OLTP workloads.
+  - **Synchronization Flow**: Triggered on demand via `POST /api/reports/sync` (or `/report/sync` internally). `SyncService` mints a short-lived internal service token (`sub: "report_service"`, `role: "admin"`) and fetches paginated data from `user-service` (`GET /user`) and `operation-service` (`GET /product`, `GET /order`).
+  - **Atomicity & Safe Snapshots**: Snapshots are updated atomically in a single transaction across users, products, and orders. If any upstream fetch fails, the transaction rolls back, preserving existing snapshots without purging. Stale records are only removed after a complete, successful fetch.
+  - **Railway Private URLs & Ports**:
+    - `USER_SERVICE_BASE_URL=http://${{user-service.RAILWAY_PRIVATE_DOMAIN}}:8001` (Port must be `8001`, NOT `8080`).
+    - `OPERATION_SERVICE_BASE_URL=http://${{operation-service.RAILWAY_PRIVATE_DOMAIN}}:8002` (Port must be `8002`, NOT `8080`).
+  - **Common Failure Causes & Diagnosis**:
+    - `502 Bad Gateway` (`err_502_sync_failed`): Usually caused by incorrect upstream private ports (e.g. configuring `8080` instead of `8001`/`8002`), mismatched `JWT_SECRET_KEY`, or slow network exceeding `SYNC_TIMEOUT_SECONDS`.
+    - Inspect application logs in Railway for `report-service` where `SyncService` logs the target URL, HTTP status code, and sanitized diagnostic reasons.
+  - **Testing Health & Sync**:
+    - Gateway health: `curl -s https://<kong-domain>/health`
+    - Report service health: `curl -s https://<kong-domain>/health/report`
+    - Trigger sync: `curl -s -X POST -H "Authorization: Bearer <ADMIN_OR_STAFF_JWT>" https://<kong-domain>/api/reports/sync`
 
 ---
 
