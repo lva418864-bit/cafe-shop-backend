@@ -63,3 +63,83 @@ def test_report_forbidden_for_regular_customer(client):
     customer_headers = auth_header(sub=10, role="customer")
     res = client.get("/report/sales-summary", headers=customer_headers)
     assert res.status_code == 403
+
+
+def test_trigger_sync_unauthorized_without_token(client):
+    res = client.post("/report/sync")
+    assert res.status_code == 401
+    body = res.json()
+    assert body["success"] is False
+    assert body["error_code"] == "err_401"
+
+
+def test_trigger_sync_forbidden_for_customer(client):
+    customer_headers = auth_header(sub=10, role="customer")
+    res = client.post("/report/sync", headers=customer_headers)
+    assert res.status_code == 403
+    body = res.json()
+    assert body["success"] is False
+    assert body["error_code"] == "err_403"
+
+
+def test_trigger_sync_success_contract(client, monkeypatch):
+    from app.api import report_route
+
+    dummy_result = {
+        "users_synced": 5,
+        "products_synced": 10,
+        "orders_synced": 20,
+        "stale_users_removed": 1,
+        "stale_products_removed": 2,
+        "stale_orders_removed": 3,
+    }
+    monkeypatch.setattr(report_route.sync_service, "sync_all", lambda _db: dummy_result)
+
+    admin_headers = auth_header(sub=1, role="admin")
+    res = client.post("/report/sync", headers=admin_headers)
+    assert res.status_code == 200
+    body = res.json()
+    assert body["success"] is True
+    assert body["message"] == "Sync completed successfully"
+    data = body["data"]
+    assert data["users_synced"] == 5
+    assert data["products_synced"] == 10
+    assert data["orders_synced"] == 20
+
+
+def test_trigger_sync_staff_allowed(client, monkeypatch):
+    from app.api import report_route
+
+    dummy_result = {
+        "users_synced": 1,
+        "products_synced": 1,
+        "orders_synced": 1,
+        "stale_users_removed": 0,
+        "stale_products_removed": 0,
+        "stale_orders_removed": 0,
+    }
+    monkeypatch.setattr(report_route.sync_service, "sync_all", lambda _db: dummy_result)
+
+    staff_headers = auth_header(sub=2, role="staff")
+    res = client.post("/report/sync", headers=staff_headers)
+    assert res.status_code == 200
+    assert res.json()["success"] is True
+
+
+def test_trigger_sync_returns_502_on_upstream_failure(client, monkeypatch):
+    from app.api import report_route
+    from app.core.exception import SyncFailed
+
+    def _fail(_db):
+        raise SyncFailed("http://user-service.railway.internal:8001", "Connection refused")
+
+    monkeypatch.setattr(report_route.sync_service, "sync_all", _fail)
+
+    admin_headers = auth_header(sub=1, role="admin")
+    res = client.post("/report/sync", headers=admin_headers)
+    assert res.status_code == 502
+    body = res.json()
+    assert body["success"] is False
+    assert body["error_code"] == "err_502_sync_failed"
+    assert "Failed to sync data" in body["message"]
+    assert body["data"] is None

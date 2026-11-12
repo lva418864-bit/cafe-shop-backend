@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     SERVICE_TOKEN_EXPIRE_MINUTES: int = 5
 
     SYNC_PAGE_SIZE: int = 100
+    SYNC_TIMEOUT_SECONDS: float = 30.0
 
     CORS_ORIGINS: Annotated[list[str], NoDecode] = ["*"]
 
